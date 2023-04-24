@@ -94,6 +94,7 @@ object CompletionProvider {
             val completions = getCompletions()(context, flix, index, nonOptionRoot, deltaContext) ++
               FromErrorsCompleter.getCompletions(context)(flix, index, nonOptionRoot, deltaContext)
             // Find the best completion
+            debugging(completions)
             val best = CompletionRanker.findBest(completions, index, deltaContext)
             boostBestCompletion(best)(context, flix) ++ completions.map(comp => comp.toCompletionItem(context))
           case None => Nil
@@ -200,6 +201,32 @@ object CompletionProvider {
     }
   }
 
+  private def debugging(completions: Iterable[Completion]): Unit = {
+    completions.foreach {
+      case Completion.KeywordCompletion(name) => println(s"KeyWord: $name")
+      case Completion.FieldCompletion(name) => println(s"Field: $name")
+      case Completion.PredicateCompletion(name, _) => println(s"Predicate: $name")
+      case Completion.TypeBuiltinCompletion(name, _, _, _) => println(s"TypeBultin: $name")
+      case Completion.TypeEnumCompletion(enumSym, _, _, _, _) => println(s"TypeEnum: ${enumSym.name}")
+      case Completion.TypeAliasCompletion(aliasSym, _, _, _, _) => println(s"TypeAlias: ${aliasSym.name}")
+      case Completion.EffectCompletion(name, _, _) => println(s"Effect: $name")
+      case Completion.WithCompletion(name, _, _, _, _) => println(s"With: $name")
+      case Completion.ImportNewCompletion(constructor, _, _) => println(constructor.toString)
+      case Completion.ImportMethodCompletion(method, _) => println(method.toString)
+      case Completion.ImportFieldCompletion(field, _, _) => println(field.toString)
+      case Completion.ClassCompletion(name) => println(s"Class: $name")
+      case Completion.SnippetCompletion(name, _, _) => println(s"Snippet: $name")
+      case Completion.VarCompletion(sym, _) => println(s"Var: $sym")
+      case Completion.DefCompletion(decl) => println(s"Def: ${decl.sym}")
+      case Completion.SigCompletion(decl) => println(s"Sig: ${decl.sym}")
+      case Completion.OpCompletion(decl) => println(s"Op: ${decl.sym}")
+      case Completion.MatchCompletion(sym, _, _) => println(s"Match: $sym")
+      case Completion.InstanceCompletion(clazz, _) => println(s"Instance: ${clazz.sym}")
+      case Completion.UseCompletion(name, _) => println(s"Use: $name")
+      case Completion.FromErrorsCompletion(name) => println(s"FromError: $name")
+    }
+  }
+
   /**
     * Returns a list of completions that may be used in a position where an expression is needed.
     * This should include all completions supported that could be an expression.
@@ -291,7 +318,7 @@ object CompletionProvider {
         case Some(s) => getLastWord(s)
       }
       val range = Range(Position(y, start), Position(y, end))
-      val sctx = getSyntacticContext(uri, pos, errors)
+      val sctx = getSyntacticContext(pos, errors)
       CompletionContext(uri, pos, range, sctx, word, previousWord, prefix, errors)
     }
   }
@@ -301,7 +328,7 @@ object CompletionProvider {
     *
     * We have to check that the syntax error occurs in the same place as the completion.
     */
-  private def getSyntacticContext(uri: String, pos: Position, errors: List[CompilationMessage]): SyntacticContext =
+  private def getSyntacticContext(pos: Position, errors: List[CompilationMessage]): SyntacticContext =
     errors.filter({
       case err => err.loc.beginLine == pos.line
     }).collectFirst({
