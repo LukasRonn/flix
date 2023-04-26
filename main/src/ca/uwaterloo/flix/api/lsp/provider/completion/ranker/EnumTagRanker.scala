@@ -17,7 +17,8 @@
 package ca.uwaterloo.flix.api.lsp.provider.completion.ranker
 
 import ca.uwaterloo.flix.api.lsp.provider.completion.Completion
-import ca.uwaterloo.flix.language.ast.{SourceLocation, Symbol}
+import ca.uwaterloo.flix.api.lsp.provider.completion.Completion.EnumTagCompletion
+import ca.uwaterloo.flix.language.ast.{SourceKind, SourceLocation, Symbol}
 import ca.uwaterloo.flix.util.collection.MultiMap
 
 object EnumTagRanker {
@@ -25,8 +26,32 @@ object EnumTagRanker {
   /**
     * Find the best enum tag completion.
     */
-  def findBest(completions: Iterable[Completion], tagUses: MultiMap[Symbol.CaseSym, SourceLocation]): Option[Completion] = {
-    // TODO
-    None
+  def findBest(completions: Iterable[Completion], tagUses: MultiMap[Symbol.CaseSym, SourceLocation]): Option[EnumTagCompletion] = {
+    // Remove all none enumTag completions
+    getEnumTagCompletions(completions)
+      // Find the enumTag comp that has 0 Real uses
+      .find(enumTagComp =>
+        hasNoRealSourceKinds(tagUses(enumTagComp.caseSym)))
   }
+
+  /**
+    * Returns a list only consisting of enumTag completions.
+    *
+    * @param completions the list of all possible completions.
+    * @return            a List of EnumTagCompletion.
+    */
+  private def getEnumTagCompletions(completions: Iterable[Completion]): Iterable[EnumTagCompletion] = {
+    completions.collect {
+      case comp: EnumTagCompletion => comp
+    }
+  }
+
+  /**
+    * Checks if set[SourceLocation] does not contain any SourceKind.Real
+    *
+    * @param set the set of SourceLocations.
+    * @return    true, if none of the SourceKinds are Real, false otherwise.
+    */
+  private def hasNoRealSourceKinds(set: Set[SourceLocation]): Boolean =
+    !set.exists(_.locationKind == SourceKind.Real)
 }
