@@ -224,6 +224,7 @@ object CompletionProvider {
       case Completion.InstanceCompletion(clazz, _) => println(s"Instance: ${clazz.sym}")
       case Completion.UseCompletion(name, _) => println(s"Use: $name")
       case Completion.FromErrorsCompletion(name) => println(s"FromError: $name")
+      case Completion.EnumTagCompletion(enumSym, caseSym) => println(s"EnumTag: ${enumSym.name}.${caseSym.name}")
     }
   }
 
