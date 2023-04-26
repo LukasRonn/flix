@@ -205,7 +205,7 @@ object CompletionProvider {
     completions.foreach {
       case Completion.KeywordCompletion(name) => println(s"KeyWord: $name")
       case Completion.FieldCompletion(name) => println(s"Field: $name")
-      case Completion.PredicateCompletion(name, _) => println(s"Predicate: $name")
+      case Completion.PredicateCompletion(name, _, _) => println(s"Predicate: $name")
       case Completion.TypeBuiltinCompletion(name, _, _, _) => println(s"TypeBultin: $name")
       case Completion.TypeEnumCompletion(enumSym, _, _, _, _) => println(s"TypeEnum: ${enumSym.name}")
       case Completion.TypeAliasCompletion(aliasSym, _, _, _, _) => println(s"TypeAlias: ${aliasSym.name}")
