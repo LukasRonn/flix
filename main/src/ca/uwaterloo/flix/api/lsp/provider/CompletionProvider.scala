@@ -147,7 +147,7 @@ object CompletionProvider {
       case SyntacticContext.Decl.Class => return Nil
       case SyntacticContext.Expr.Constraint => return PredicateCompleter.getCompletions(context)
       case _: SyntacticContext.Type => return TypeCompleter.getCompletions(context)
-      case _: SyntacticContext.Pat => return Nil
+      case _: SyntacticContext.Pat => return EnumTagCompleter.getCompletions(context)
       case _ => // fallthrough
     }
 
