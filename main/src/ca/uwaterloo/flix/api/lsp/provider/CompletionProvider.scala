@@ -93,6 +93,7 @@ object CompletionProvider {
             // Get all completions
             val completions = getCompletions()(context, flix, index, nonOptionRoot, deltaContext) ++
               FromErrorsCompleter.getCompletions(context)(flix, index, nonOptionRoot, deltaContext)
+            debugging(completions)
             // Find the best completion
             val best = CompletionRanker.findBest(completions, index, deltaContext)
             boostBestCompletion(best)(context, flix) ++ completions.map(comp => comp.toCompletionItem(context))
@@ -168,6 +169,33 @@ object CompletionProvider {
       case instanceRegex() => InstanceCompleter.getCompletions(context)
 
       case _ => KeywordOtherCompleter.getCompletions(context) ++ SnippetCompleter.getCompletions(context)
+    }
+  }
+
+  private def debugging(completions: Iterable[Completion]): Unit = {
+    completions.foreach {
+      case Completion.KeywordCompletion(name) => println(s"KeyWord: $name")
+      case Completion.FieldCompletion(name) => println(s"Field: $name")
+      case Completion.PredicateCompletion(name, _, _) => println(s"Predicate: $name")
+      case Completion.TypeBuiltinCompletion(name, _, _, _) => println(s"TypeBuiltin: $name")
+      case Completion.TypeEnumCompletion(enumSym, _, _, _, _) => println(s"TypeEnum: ${enumSym.name}")
+      case Completion.TypeAliasCompletion(aliasSym, _, _, _, _) => println(s"TypeAlias: ${aliasSym.name}")
+      case Completion.EffectCompletion(sym, _) => println(s"Effect: ${sym.name}")
+      case Completion.WithCompletion(name, _, _, _, _) => println(s"With: $name")
+      case Completion.ImportNewCompletion(constructor, _, _) => println(constructor.toString)
+      case Completion.ImportMethodCompletion(method, _) => println(method.toString)
+      case Completion.ImportFieldCompletion(field, _, _) => println(field.toString)
+      case Completion.ClassCompletion(name) => println(s"Class: $name")
+      case Completion.SnippetCompletion(name, _, _) => println(s"Snippet: $name")
+      case Completion.VarCompletion(sym, _) => println(s"Var: $sym")
+      case Completion.DefCompletion(decl) => println(s"Def: ${decl.sym}")
+      case Completion.SigCompletion(decl) => println(s"Sig: ${decl.sym}")
+      case Completion.OpCompletion(decl) => println(s"Op: ${decl.sym}")
+      case Completion.MatchCompletion(sym, _, _) => println(s"Match: $sym")
+      case Completion.InstanceCompletion(clazz, _) => println(s"Instance: ${clazz.sym}")
+      case Completion.UseCompletion(name, _) => println(s"Use: $name")
+      case Completion.FromErrorsCompletion(name) => println(s"FromError: $name")
+      case Completion.EnumTagCompletion(enumSym, caseSym) => println(s"EnumTag: ${enumSym.name}.${caseSym.name}")
     }
   }
 
