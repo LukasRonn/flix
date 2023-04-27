@@ -42,5 +42,12 @@ object TypeEnumCompleter extends Completer {
     * @param word the current word.
     * @return     true, if the enum matches word, false otherwise.
     */
-  private def matchesTypeEnum(sym: Symbol.EnumSym, word: String): Boolean = sym.toString.startsWith(word)
+  private def matchesTypeEnum(sym: Symbol.EnumSym, word: String): Boolean = {
+    sym.name.split('.').toList match {
+      case Nil => false
+      case x :: Nil => x.startsWith(word)
+      case ns :: y :: Nil => ns.startsWith(word) || y.startsWith(word)
+      case _ => false
+    }
+  }
 }
