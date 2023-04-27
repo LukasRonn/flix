@@ -32,6 +32,16 @@ sealed trait Completion {
     * Returns a LSP completion item for `this`.
     */
   def toCompletionItem(context: CompletionContext)(implicit flix: Flix): CompletionItem = this match {
+
+    case Completion.EffectCompletion(sym, doc) =>
+      val name = sym.toString
+      CompletionItem(label = name,
+        sortText = name,
+        textEdit = TextEdit(context.range, name),
+        documentation = Some(doc),
+        insertTextFormat = InsertTextFormat.Snippet,
+        kind = CompletionItemKind.Enum)
+
     case Completion.KeywordCompletion(name) =>
       CompletionItem(label = name,
         sortText = Priority.normal(name),
@@ -74,13 +84,7 @@ sealed trait Completion {
         documentation = documentation,
         insertTextFormat = InsertTextFormat.Snippet,
         kind = CompletionItemKind.Enum)
-    case Completion.EffectCompletion(name, priority, documentation) =>
-      CompletionItem(label = name,
-        sortText = priority,
-        textEdit = TextEdit(context.range, name),
-        documentation = documentation,
-        insertTextFormat = InsertTextFormat.Snippet,
-        kind = CompletionItemKind.Enum)
+
     case Completion.WithCompletion(name, priority, textEdit, documentation, insertTextFormat) =>
       CompletionItem(label = name,
         sortText = priority,
@@ -213,6 +217,14 @@ sealed trait Completion {
 object Completion {
 
   /**
+    * Represents an effect symbol completion.
+    *
+    * @param sym the effect symbol.
+    * @param doc the documentation associated with the effect.
+    */
+  case class EffectCompletion(sym: Symbol.EffectSym, doc: String) extends Completion
+
+  /**
     * Represents a keyword completion.
     *
     * @param name the name of the keyword.
@@ -269,15 +281,6 @@ object Completion {
     */
   case class TypeAliasCompletion(aliasSym: TypeAliasSym, nameSuffix: String, priority: String, textEdit: TextEdit,
                                  documentation: Option[String]) extends Completion
-
-  /**
-    * Represents a Effect completion
-    *
-    * @param name          the name of the effect.
-    * @param priority      the priority of the effect.
-    * @param documentation a human-readable string that represents a doc-comment.
-    */
-  case class EffectCompletion(name: String, priority: String, documentation: Option[String]) extends Completion
 
   /**
     * Represents a With completion
