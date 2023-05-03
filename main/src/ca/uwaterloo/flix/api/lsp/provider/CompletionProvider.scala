@@ -92,10 +92,12 @@ object CompletionProvider {
           case Some(nonOptionRoot) =>
             // Get all completions
             val completions = getCompletions()(context, flix, index, nonOptionRoot, deltaContext)
-            debugging(completions)
+            debugging(completions)(context, flix)
             // Find the best completion
             val best = CompletionRanker.findBest(completions, index, deltaContext)
-            boostBestCompletion(best)(context, flix) ++ completions.map(comp => comp.toCompletionItem(context))
+            val boosted = boostBestCompletion(best)(context, flix)
+            println(s"Boosted CompletionItem: $boosted")
+            boosted ++ completions.map(comp => comp.toCompletionItem(context))
           case None => Nil
         }
     }
@@ -196,7 +198,7 @@ object CompletionProvider {
     }
   }
 
-  private def debugging(completions: Iterable[Completion]): Unit = {
+  private def debugging(completions: Iterable[Completion])(implicit context: CompletionContext, flix: Flix): Unit = {
     completions.foreach {
       case Completion.KeywordCompletion(name) => println(s"KeyWord: $name")
       case Completion.FieldCompletion(name) => println(s"Field: $name")
@@ -211,7 +213,7 @@ object CompletionProvider {
       case Completion.ImportFieldCompletion(field, _, _) => println(field.toString)
       case Completion.ClassCompletion(name) => println(s"Class: $name")
       case Completion.SnippetCompletion(name, _, _) => println(s"Snippet: $name")
-      case Completion.VarCompletion(sym, _) => println(s"Var: $sym")
+      case Completion.VarCompletion(sym, tpe) => println(s"Var: $sym: CompletionItem: ${Completion.VarCompletion(sym, tpe).toCompletionItem(context)}")
       case Completion.DefCompletion(decl) => println(s"Def: ${decl.sym}")
       case Completion.SigCompletion(decl) => println(s"Sig: ${decl.sym}")
       case Completion.OpCompletion(decl) => println(s"Op: ${decl.sym}")
