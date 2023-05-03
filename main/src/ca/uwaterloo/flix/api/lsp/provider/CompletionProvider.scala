@@ -91,9 +91,8 @@ object CompletionProvider {
         root match {
           case Some(nonOptionRoot) =>
             // Get all completions
-            val completions = getCompletions()(context, flix, index, nonOptionRoot, deltaContext) ++
-              FromErrorsCompleter.getCompletions(context)(flix, index, nonOptionRoot, deltaContext)
-            debugging(completions)
+            val completions = getCompletions()(context, flix, index, nonOptionRoot, deltaContext)
+
             // Find the best completion
             val best = CompletionRanker.findBest(completions, index, deltaContext)
             boostBestCompletion(best)(context, flix) ++ completions.map(comp => comp.toCompletionItem(context))
@@ -111,7 +110,7 @@ object CompletionProvider {
     if (root.isEmpty) return Nil
     val entity = index.query(uri, pos)
     entity match {
-      case Some(Entity.Exp(TypedAst.Expression.HoleWithExp(TypedAst.Expression.Var(sym, sourceType, _), targetType, _, _, loc))) =>
+      case Some(Entity.Exp(TypedAst.Expression.HoleWithExp(TypedAst.Expression.Var(sym, sourceType, _), targetType, _, loc))) =>
         HoleCompletion.candidates(sourceType, targetType, root.get)
           .map(root.get.defs(_))
           .filter(_.spec.mod.isPublic)
@@ -142,77 +141,59 @@ object CompletionProvider {
   }
 
   private def getCompletions()(implicit context: CompletionContext, flix: Flix, index: Index, root: TypedAst.Root, delta: DeltaContext): Iterable[Completion] = {
-    // First, we try to get the syntactic context from the parser or from an error message.
-    println(s"Context.sctx: ${context.sctx}")
     context.sctx match {
-      case SyntacticContext.Decl.Class => return KeywordOtherCompleter.getCompletions(context)
-      case SyntacticContext.Expr.Constraint => return PredicateCompleter.getCompletions(context)
-      case SyntacticContext.Expr.Do => return OpCompleter.getCompletions(context)
-      case _: SyntacticContext.Expr => return getExpCompletions()
-      case SyntacticContext.Import => return ImportCompleter.getCompletions(context)
-      case SyntacticContext.Type.Eff => return EffSymCompleter.getCompletions(context)
-      case _: SyntacticContext.Type => return TypeCompleter.getCompletions(context)
-      case _: SyntacticContext.Pat => return Nil
-      case _ => // fallthrough
+      //
+      // Expressions.
+      //
+      case SyntacticContext.Expr.Constraint => PredicateCompleter.getCompletions(context)
+      case SyntacticContext.Expr.Do => OpCompleter.getCompletions(context)
+      case _: SyntacticContext.Expr => ExprCompleter.getCompletions(context)
+
+      //
+      // Declarations.
+      //
+      case SyntacticContext.Decl.Class => KeywordOtherCompleter.getCompletions(context)
+      case SyntacticContext.Decl.Enum => KeywordOtherCompleter.getCompletions(context)
+      case SyntacticContext.Decl.Instance => KeywordOtherCompleter.getCompletions(context)
+      case _: SyntacticContext.Decl =>
+        KeywordOtherCompleter.getCompletions(context) ++
+          InstanceCompleter.getCompletions(context) ++
+          SnippetCompleter.getCompletions(context)
+
+      //
+      // Imports.
+      //
+      case SyntacticContext.Import => ImportCompleter.getCompletions(context)
+
+      //
+      // Types.
+      //
+      case SyntacticContext.Type.Eff => EffSymCompleter.getCompletions(context)
+      case SyntacticContext.Type.OtherType => TypeCompleter.getCompletions(context)
+
+      //
+      // Patterns.
+      //
+      case _: SyntacticContext.Pat => Nil
+
+      //
+      // Uses.
+      //
+      case SyntacticContext.Use => UseCompleter.getCompletions(context)
+
+      //
+      // With.
+      //
+      case SyntacticContext.WithClause =>
+        // A with context could also be just a type context.
+        TypeCompleter.getCompletions(context) ++ WithCompleter.getCompletions(context)
+
+      //
+      // Fallthrough.
+      //
+      case SyntacticContext.Unknown =>
+        KeywordOtherCompleter.getCompletions(context) ++ SnippetCompleter.getCompletions(context)
     }
-
-    // No luck, fall back to regular expressions:
-
-    // If we match one of the we know what type of completion we need
-    val withRegex = raw".*\s*wi?t?h?(?:\s+[^\s]*)?".r
-    val useRegex = raw"\s*use\s+[^\s]*".r
-    val instanceRegex = raw"\s*instance\s+[^s]*".r
-
-    // We check type and effect first because for example following def we do not want completions other than type and effect if applicable.
-    context.prefix match {
-      case withRegex() => WithCompleter.getCompletions(context)
-      case useRegex() => UseCompleter.getCompletions(context)
-      case instanceRegex() => InstanceCompleter.getCompletions(context)
-
-      case _ => KeywordOtherCompleter.getCompletions(context) ++ SnippetCompleter.getCompletions(context)
-    }
-  }
-
-  private def debugging(completions: Iterable[Completion]): Unit = {
-    completions.foreach {
-      case Completion.KeywordCompletion(name) => println(s"KeyWord: $name")
-      case Completion.FieldCompletion(name) => println(s"Field: $name")
-      case Completion.PredicateCompletion(name, _, _) => println(s"Predicate: $name")
-      case Completion.TypeBuiltinCompletion(name, _, _, _) => println(s"TypeBuiltin: $name")
-      case Completion.TypeEnumCompletion(enumSym, _, _, _, _) => println(s"TypeEnum: ${enumSym.name}")
-      case Completion.TypeAliasCompletion(aliasSym, _, _, _, _) => println(s"TypeAlias: ${aliasSym.name}")
-      case Completion.EffectCompletion(sym, _) => println(s"Effect: ${sym.name}")
-      case Completion.WithCompletion(name, _, _, _, _) => println(s"With: $name")
-      case Completion.ImportNewCompletion(constructor, _, _) => println(constructor.toString)
-      case Completion.ImportMethodCompletion(method, _) => println(method.toString)
-      case Completion.ImportFieldCompletion(field, _, _) => println(field.toString)
-      case Completion.ClassCompletion(name) => println(s"Class: $name")
-      case Completion.SnippetCompletion(name, _, _) => println(s"Snippet: $name")
-      case Completion.VarCompletion(sym, _) => println(s"Var: $sym")
-      case Completion.DefCompletion(decl) => println(s"Def: ${decl.sym}")
-      case Completion.SigCompletion(decl) => println(s"Sig: ${decl.sym}")
-      case Completion.OpCompletion(decl) => println(s"Op: ${decl.sym}")
-      case Completion.MatchCompletion(sym, _, _) => println(s"Match: $sym")
-      case Completion.InstanceCompletion(clazz, _) => println(s"Instance: ${clazz.sym}")
-      case Completion.UseCompletion(name, _) => println(s"Use: $name")
-      case Completion.FromErrorsCompletion(name) => println(s"FromError: $name")
-      case Completion.EnumTagCompletion(enumSym, caseSym) => println(s"EnumTag: ${enumSym.name}.${caseSym.name}")
-    }
-  }
-
-  /**
-    * Returns a list of completions that may be used in a position where an expression is needed.
-    * This should include all completions supported that could be an expression.
-    * All of the completions are not necessarily sound.
-    */
-  private def getExpCompletions()(implicit context: CompletionContext, flix: Flix, index: Index, root: TypedAst.Root, deltaContext: DeltaContext): Iterable[Completion] = {
-    KeywordExprCompleter.getCompletions(context) ++
-      SnippetCompleter.getCompletions(context) ++
-      VarCompleter.getCompletions(context) ++
-      DefCompleter.getCompletions(context) ++
-      SignatureCompleter.getCompletions(context) ++
-      FieldCompleter.getCompletions(context) ++
-      MatchCompleter.getCompletions(context)
   }
 
   /**
@@ -307,9 +288,8 @@ object CompletionProvider {
       case ParseError(_, ctx, _) => ctx
       case WeederError.IllegalJavaClass(_, _) => SyntacticContext.Import
       case ResolutionError.UndefinedType(_, _, _) => SyntacticContext.Type.OtherType
-      case ResolutionError.UndefinedName(_, _, _, _) => SyntacticContext.Expr.OtherExpr
+      case ResolutionError.UndefinedName(_, _, _, isUse, _) => if (isUse) SyntacticContext.Use else SyntacticContext.Expr.OtherExpr
       case ResolutionError.UndefinedVar(_, _) => SyntacticContext.Expr.OtherExpr
-      // TODO: SYNTACTIC-CONTEXT
     }).getOrElse(SyntacticContext.Unknown)
 
 }

@@ -122,10 +122,13 @@ object Parser {
       case "Expression" => SyntacticContext.Expr.OtherExpr
       case "Constraint" => SyntacticContext.Expr.Constraint
       case "Do" => SyntacticContext.Expr.Do
+
       case "Class" => SyntacticContext.Decl.Class
       case "Enum" => SyntacticContext.Decl.Enum
-      case "Pattern" => SyntacticContext.Pat.OtherPat
       case "Instance" => SyntacticContext.Decl.Instance
+      case "Decls" => SyntacticContext.Decl.OtherDecl
+
+      case "Pattern" => SyntacticContext.Pat.OtherPat
 
       case "ImportOne" => SyntacticContext.Import
       case "ImportMany" => SyntacticContext.Import
@@ -137,8 +140,16 @@ object Parser {
       case "GetStaticField" => SyntacticContext.Import
       case "PutStaticField" => SyntacticContext.Import
 
+      case "UseOne" => SyntacticContext.Use
+      case "UseMany" => SyntacticContext.Use
+      case "UseName" => SyntacticContext.Use
+
       case "EffectSetOrEmpty" => SyntacticContext.Type.Eff
+
       case "Type" => SyntacticContext.Type.OtherType
+
+      case "WithClause" => SyntacticContext.WithClause
+
       case _ => SyntacticContext.Unknown
     }
   }
@@ -233,19 +244,19 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
     }
 
     def Def: Rule1[ParsedAst.Declaration.Def] = rule {
-      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("def") ~ WS ~ Names.Definition ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ ":" ~ optWS ~ TypeAndEffect ~ optWS ~ OptTypeConstraintList ~ optWS ~ OptEqualityConstraintList ~ optWS ~ "=" ~ optWS ~ Expressions.Stm ~ SP ~> ParsedAst.Declaration.Def
+      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("def") ~ WS ~ Names.Definition ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ ":" ~ optWS ~ TypeAndEffect ~ optWS ~ WithClause ~ optWS ~ OptEqualityConstraintList ~ optWS ~ "=" ~ optWS ~ Expressions.Stm ~ SP ~> ParsedAst.Declaration.Def
     }
 
     def Sig: Rule1[ParsedAst.Declaration.Sig] = rule {
-      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("def") ~ WS ~ Names.Definition ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ ":" ~ optWS ~ TypeAndEffect ~ optWS ~ OptTypeConstraintList ~ optional(optWS ~ "=" ~ optWS ~ Expressions.Stm) ~ SP ~> ParsedAst.Declaration.Sig
+      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("def") ~ WS ~ Names.Definition ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ ":" ~ optWS ~ TypeAndEffect ~ optWS ~ WithClause ~ optional(optWS ~ "=" ~ optWS ~ Expressions.Stm) ~ SP ~> ParsedAst.Declaration.Sig
     }
 
     def Law: Rule1[ParsedAst.Declaration.Law] = rule {
-      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("law") ~ WS ~ Names.Definition ~ optWS ~ ":" ~ optWS ~ keyword("forall") ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ OptTypeConstraintList ~ optWS ~ "." ~ optWS ~ Expression ~ SP ~> ParsedAst.Declaration.Law
+      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("law") ~ WS ~ Names.Definition ~ optWS ~ ":" ~ optWS ~ keyword("forall") ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ WithClause ~ optWS ~ "." ~ optWS ~ Expression ~ SP ~> ParsedAst.Declaration.Law
     }
 
     def Op: Rule1[ParsedAst.Declaration.Op] = rule {
-      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("def") ~ WS ~ Names.Definition ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ ":" ~ optWS ~ TypeAndEffect ~ optWS ~ OptTypeConstraintList ~ SP ~> ParsedAst.Declaration.Op
+      Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("def") ~ WS ~ Names.Definition ~ optWS ~ TypeParams ~ optWS ~ FormalParamList ~ optWS ~ ":" ~ optWS ~ TypeAndEffect ~ optWS ~ WithClause ~ SP ~> ParsedAst.Declaration.Op
     }
 
     def Enum: Rule1[ParsedAst.Declaration] = {
@@ -324,7 +335,7 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
 
     def Class: Rule1[ParsedAst.Declaration] = {
       def Head = rule {
-        Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("class") ~ WS ~ Names.Class ~ optWS ~ "[" ~ optWS ~ TypeParam ~ optWS ~ "]" ~ optWS ~ OptTypeConstraintList
+        Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("class") ~ WS ~ Names.Class ~ optWS ~ "[" ~ optWS ~ TypeParam ~ optWS ~ "]" ~ optWS ~ WithClause
       }
 
       def EmptyBody = namedRule("ClassBody") {
@@ -344,7 +355,7 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
       SP ~ Names.QualifiedClass ~ optWS ~ "[" ~ optWS ~ Type ~ optWS ~ "]" ~ SP ~> ParsedAst.TypeConstraint
     }
 
-    def OptTypeConstraintList: Rule1[Seq[ParsedAst.TypeConstraint]] = rule {
+    def WithClause: Rule1[Seq[ParsedAst.TypeConstraint]] = rule {
       optional(keyword("with") ~ WS ~ oneOrMore(TypeConstraint).separatedBy(optWS ~ "," ~ optWS)) ~> ((o: Option[Seq[ParsedAst.TypeConstraint]]) => o.getOrElse(Seq.empty))
     }
 
@@ -358,7 +369,7 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
 
     def Instance: Rule1[ParsedAst.Declaration] = {
       def Head = rule {
-        Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("instance") ~ WS ~ Names.QualifiedClass ~ optWS ~ "[" ~ optWS ~ Type ~ optWS ~ "]" ~ optWS ~ OptTypeConstraintList
+        Documentation ~ Annotations ~ Modifiers ~ SP ~ keyword("instance") ~ WS ~ Names.QualifiedClass ~ optWS ~ "[" ~ optWS ~ Type ~ optWS ~ "]" ~ optWS ~ WithClause
       }
 
       def EmptyBody = namedRule("InstanceBody") {
@@ -679,20 +690,8 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
       }
 
       rule {
-        BitwiseOr ~ zeroOrMore(And ~ BitwiseOr ~ SP ~> ParsedAst.Expression.Binary)
+        Equality ~ zeroOrMore(And ~ Equality ~ SP ~> ParsedAst.Expression.Binary)
       }
-    }
-
-    def BitwiseOr: Rule1[ParsedAst.Expression] = rule {
-      BitwiseXOr ~ zeroOrMore(optWS ~ operator("|||") ~ optWS ~ BitwiseXOr ~ SP ~> ParsedAst.Expression.Binary)
-    }
-
-    def BitwiseXOr: Rule1[ParsedAst.Expression] = rule {
-      BitwiseAnd ~ zeroOrMore(optWS ~ operator("^^^") ~ optWS ~ BitwiseAnd ~ SP ~> ParsedAst.Expression.Binary)
-    }
-
-    def BitwiseAnd: Rule1[ParsedAst.Expression] = rule {
-      Equality ~ zeroOrMore(optWS ~ operator("&&&") ~ optWS ~ Equality ~ SP ~> ParsedAst.Expression.Binary)
     }
 
     def Equality: Rule1[ParsedAst.Expression] = rule {
@@ -710,7 +709,7 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
     }
 
     def Multiplicative: Rule1[ParsedAst.Expression] = rule {
-      Compose ~ zeroOrMore(optWS ~ (operator("**") | operator("*") | operator("/")) ~ optWS ~ Compose ~ SP ~> ParsedAst.Expression.Binary)
+      Compose ~ zeroOrMore(optWS ~ (operator("*") | operator("/")) ~ optWS ~ Compose ~ SP ~> ParsedAst.Expression.Binary)
     }
 
     def Compose: Rule1[ParsedAst.Expression] = rule {
@@ -726,12 +725,12 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
 
       // NB: We allow any operator, other than a reserved operator, to be matched by this rule.
       def Reserved2: Rule1[String] = rule {
-        capture("!=" | "**" | ".." | "::" | ":=" | "<-" | "<=" | "==" | "=>" | ">=" | "or")
+        capture("!=" | ".." | "::" | ":=" | "<-" | "<=" | "==" | "=>" | ">=" | "or")
       }
 
       // NB: We allow any operator, other than a reserved operator, to be matched by this rule.
       def Reserved3: Rule1[String] = rule {
-        capture("&&&" | ":::" | "<+>" | "<=>" | "???" | "^^^" | "and" | "mod" | "not" | "rem" | "|||" | "~~~")
+        capture(":::" | "<+>" | "<=>" | "???" | "and" | "mod" | "not" | "rem")
       }
 
       // Match any two character operator which is not reserved.
@@ -767,7 +766,7 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
 
     def Unary: Rule1[ParsedAst.Expression] = {
       def UnaryOp1: Rule1[ParsedAst.Operator] = rule {
-        operator("-") | operator("~~~")
+        operator("-")
       }
 
       def UnaryOp2: Rule1[ParsedAst.Operator] = rule {
@@ -829,7 +828,7 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
         SelectChannel | Spawn | ParYield | Par | Lazy | Force |
         CheckedTypeCast | CheckedEffectCast | UncheckedCast | UncheckedMaskingCast | Intrinsic | ArrayLit | VectorLit | ListLit |
         SetLit | FMap | ConstraintSet | FixpointLambda | FixpointProject | FixpointSolveWithProject |
-        FixpointQueryWithSelect | ConstraintSingleton | Interpolation | Literal | Resume | Do |
+        FixpointQueryWithSelect | Interpolation | Literal | Resume | Do |
         Discard | Debug | ApplicativeFor | ForEachYield | MonadicFor | ForEach | NewObject |
         UnaryLambda | Open | OpenAs | HolyName | QName | Hole
     }
@@ -1272,10 +1271,6 @@ class Parser(val source: Source) extends org.parboiled2.Parser {
 
     def LambdaMatch: Rule1[ParsedAst.Expression.LambdaMatch] = rule {
       SP ~ keyword("match") ~ optWS ~ Pattern ~ optWS ~ atomic("->") ~ optWS ~ Expression ~ SP ~> ParsedAst.Expression.LambdaMatch
-    }
-
-    def ConstraintSingleton: Rule1[ParsedAst.Expression] = rule {
-      atomic("#") ~ optWS ~ SP ~ Constraint ~ SP ~> ParsedAst.Expression.FixpointConstraint
     }
 
     def ConstraintSet: Rule1[ParsedAst.Expression] = rule {

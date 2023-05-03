@@ -334,6 +334,23 @@ object Ast {
   }
 
   /**
+    * A common super-type that represents a call type.
+    */
+  sealed trait CallType
+
+  object CallType {
+    /**
+      * Represents a call in tail position.
+      */
+    case object TailCall extends CallType
+
+    /**
+      * Represents a call in non-tail position.
+      */
+    case object NonTailCall extends CallType
+  }
+
+  /**
     * Documentation.
     *
     * @param lines the lines of the comments.
@@ -827,6 +844,10 @@ object Ast {
       case object OtherType extends Type
     }
 
+    case object Use extends SyntacticContext
+
+    case object WithClause extends SyntacticContext
+
     case object Unknown extends SyntacticContext
 
     def join(ctx1: SyntacticContext, ctx2: SyntacticContext): SyntacticContext = (ctx1, ctx2) match {
@@ -835,6 +856,10 @@ object Ast {
 
       case (_, SyntacticContext.Unknown) => ctx1
       case (SyntacticContext.Unknown, _) => ctx2
+
+      case (SyntacticContext.Type.OtherType, SyntacticContext.WithClause) => SyntacticContext.WithClause
+      case (SyntacticContext.WithClause, SyntacticContext.Type.OtherType) => SyntacticContext.WithClause
+
       case _ => ctx1
     }
   }
